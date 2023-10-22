@@ -175,13 +175,9 @@ function simple_neighbor(instance::Instance,solution::Solution)
     if iszero(solution.conflictmatrix)
         fill_conflicts(instance,solution)
     end
-    possible_changes = findall(
-        solution.conflictmatrix .== minimum(solution.conflictmatrix) .&&
-        1:instance.k .!= permutedims(solution.nodecolors)) # Éviter de garder la même solution si possible
-    if isempty(possible_changes)
-        return # minimum local
-    end
-    color,node = Tuple(rand(possible_changes)) # Modification aléatoire
+    improvementmatrix = solution.conflictmatrix .-
+        sum(solution.conflictmatrix .* (1:instance.k .== permutedims(solution.nodecolors)),dims=1)
+    color,node = Tuple(argmin(improvementmatrix))
     update_conflicts(instance,solution,node,color)
 end
 
@@ -194,11 +190,11 @@ function tabu_neighbor(instance::Instance,solution::Solution,tabulength::Int,it:
     if iszero(solution.conflictmatrix)
         fill_conflicts(instance,solution)
     end
-    tabupenalizedconflictmatrix = solution.conflictmatrix + length(instance)^2*(
-        solution.tabuexpiry .> it .|| # TABOU (application)
-        1:instance.k .== permutedims(solution.nodecolors)) # Garder la même solution est interdit
-    possible_changes = findall(solution.conflictmatrix .== minimum(tabupenalizedconflictmatrix))
-    color,node = Tuple(rand(possible_changes)) # Modification aléatoire
+    improvementmatrix = solution.conflictmatrix .-
+        sum(solution.conflictmatrix .* (1:instance.k .== permutedims(solution.nodecolors)),dims=1)
+    tabupenalizedimprovementmatrix = improvementmatrix + 2*length(instance)*(
+        solution.tabuexpiry .> it) # TABOU (application)
+    color,node = Tuple(argmin(tabupenalizedimprovementmatrix))
     solution.tabuexpiry[color,node] = it+tabulength # TABOU (ajout)
     update_conflicts(instance,solution,node,color)
 end
