@@ -1,3 +1,4 @@
+using Logging
 using Random
 
 
@@ -67,20 +68,6 @@ function read_instance(path::String,k::Int)
     name = split(path,"/")[2]
     return Instance(name,graphe,k)
 end
-
-# Définit les instances à évaluer
-const instance_list = (
-    read_instance("graphs/flat300_26_0.col", 26),
-    read_instance("graphs/le450_15c.col", 15),
-    read_instance("graphs/dsjc125.1.col", 5),
-    read_instance("graphs/dsjc125.9.col", 44),
-    read_instance("graphs/dsjc250.1.col", 8),
-    read_instance("graphs/dsjc250.9.col", 72),
-    read_instance("graphs/dsjc250.5.col", 28),
-    read_instance("graphs/dsjc1000.5.col", 86),
-    read_instance("graphs/dsjc1000.5.col", 85),
-    read_instance("graphs/dsjc1000.5.col", 84)
-)
 
 # Fonctions de base
 
@@ -201,13 +188,28 @@ end
 
 
 
-# Algorithme génétique
+# Algorithme mémétique
 
-# On commence par coder le tabou et si on a le temps on fait le génétique
-# ça a l'air de prendre beaucoup plus de temps que je croyais
+function simple_local_search(instance::Instance,population::Vector{Solution},MAXIT::Int)
+    for solution ∈ population
+        old_obj = length(instance)^2
+        for t = 1:MAXIT
+            simple_neighbor(instance,solution)
+            @info string("t: ",t,"\t","conflits: ",solution.obj)
+            if old_obj==solution.obj
+                break
+            end
+            old_obj=solution.obj
+        end
+    end
+end
+
+function tabu_search(instance::Instance,population::Vector{Solution},MAXIT::Int)
+    # TODO
+end
 
 """Renvoie une solution aléatoire selon la règle de la roue de la fortune."""
-function roue_fortune(instance::Instance,population::Vector{Solution})
+function roue_fortune(population::Vector{Solution})
     # Solutions supposées évaluées
     weights = [1/sample.obj for sample ∈ population]
     cumw = cumsum(weights)
@@ -215,6 +217,62 @@ function roue_fortune(instance::Instance,population::Vector{Solution})
     return findfirst(r .<= cumw)
 end
 
-function genetique(μ::Int)
-    
+"""Copie des classes de couleurs entières des parents dans l'enfant\\
+(ce qu'il est possible de copier, on commence par les plus grandes classes)."""
+function croisement(instance::Instance,population::Vector{Solution},mom::Int,dad::Int)
+    enfant = Solution(instance,zeros(Int,length(instance)))
+    parentnodecolors = [population[mom].nodecolors population[dad].nodecolors]
+    colorcount = permutedims(stack([sum(parentnodecolors.==i,dims=1) for i = 1:length(instance)]))
+    while 0 ∈ enfant
+        color,parent = Tuple(argmax(colorcount))
+        colorcount[color,parent] = 0
+        enfant.nodecolors += color*(parentnodecolors[:,parent] .== color .&& enfant.nodecolors .== 0)
+    end
+    return enfant
+end
+
+function faire_enfants(population::Vector{Solution},λ::Int)
+    enfants = empty(population)
+    for e = 1:λ
+        mom=dad=0
+        while mom==dad
+            mom,dad=roue_fortune(population),roue_fortune(population)
+        end
+        push!(enfants,croisement(population,mom,dad))
+    end
+    return enfants
+end
+
+function mutation(solution::Solution)
+    # TODO
+end
+
+function mutation(population::Vector{Solution},r::Int)
+    for sample ∈ population
+        if rand()<r
+            mutation(sample)
+        end
+    end
+end
+
+function genetique(instance::Instance,popsize::Int,nbchildren::Int,mutp::Int,MAXIT::Int,localMAXIT::Int)
+    population = [sol_alea(instance) for i = 1:popsize]
+    for sample ∈ population
+        nbr_collision(instance,sample)
+    end
+    for t = 1:MAXIT
+        enfants = faire_enfants(population,nbchildren)
+        mutation(enfants,mutp)
+        # Remplacer par le tabou
+        simple_local_search(instance,population,localMAXIT)
+        for e ∈ enfants
+            nbr_collision(instance,e)
+        end
+        append!(population,enfants)
+        # Ajouter évitement de la convergence prématurée
+        while length(population)>popsize
+            i = roue_fortune(population)
+            popat!(population,i)
+        end
+    end
 end
