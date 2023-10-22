@@ -195,7 +195,7 @@ function simple_local_search(instance::Instance,population::Vector{Solution},MAX
         old_obj = length(instance)^2
         for t = 1:MAXIT
             simple_neighbor(instance,solution)
-            @info string("t: ",t,"\t","conflits: ",solution.obj)
+            @debug string("it: ",t,"\t","conflits: ",solution.obj)
             if old_obj==solution.obj
                 break
             end
@@ -213,7 +213,7 @@ function roue_fortune(population::Vector{Solution})
     # Solutions supposées évaluées
     weights = [1/sample.obj for sample ∈ population]
     cumw = cumsum(weights)
-    r = rand(1:sum(weights))
+    r = rand()*sum(weights)
     return findfirst(r .<= cumw)
 end
 
@@ -222,8 +222,8 @@ end
 function croisement(instance::Instance,population::Vector{Solution},mom::Int,dad::Int)
     enfant = Solution(instance,zeros(Int,length(instance)))
     parentnodecolors = [population[mom].nodecolors population[dad].nodecolors]
-    colorcount = permutedims(stack([sum(parentnodecolors.==i,dims=1) for i = 1:length(instance)]))
-    while 0 ∈ enfant
+    colorcount = permutedims(stack([vec(sum(parentnodecolors.==i,dims=1)) for i = 1:instance.k]))
+    while 0 ∈ enfant.nodecolors
         color,parent = Tuple(argmax(colorcount))
         colorcount[color,parent] = 0
         enfant.nodecolors += color*(parentnodecolors[:,parent] .== color .&& enfant.nodecolors .== 0)
@@ -231,14 +231,14 @@ function croisement(instance::Instance,population::Vector{Solution},mom::Int,dad
     return enfant
 end
 
-function faire_enfants(population::Vector{Solution},λ::Int)
+function faire_enfants(instance::Instance,population::Vector{Solution},λ::Int)
     enfants = empty(population)
     for e = 1:λ
         mom=dad=0
         while mom==dad
             mom,dad=roue_fortune(population),roue_fortune(population)
         end
-        push!(enfants,croisement(population,mom,dad))
+        push!(enfants,croisement(instance,population,mom,dad))
     end
     return enfants
 end
@@ -247,7 +247,7 @@ function mutation(solution::Solution)
     # TODO
 end
 
-function mutation(population::Vector{Solution},r::Int)
+function mutation(population::Vector{Solution},r::Float64)
     for sample ∈ population
         if rand()<r
             mutation(sample)
@@ -255,24 +255,26 @@ function mutation(population::Vector{Solution},r::Int)
     end
 end
 
-function genetique(instance::Instance,popsize::Int,nbchildren::Int,mutp::Int,MAXIT::Int,localMAXIT::Int)
+function genetique(instance::Instance,popsize::Int,nbchildren::Int,mutp::Float64,MAXIT::Int,localMAXIT::Int)
+    start_time = time()
     population = [sol_alea(instance) for i = 1:popsize]
-    for sample ∈ population
-        nbr_collision(instance,sample)
-    end
+    # Remplacer par le tabou
+    simple_local_search(instance,population,localMAXIT)
+    @info string("it: ",0,"\ttemps:",trunc(100*(time()-start_time))/100,"s\tconflits: ",[solution.obj for solution ∈ population])
     for t = 1:MAXIT
-        enfants = faire_enfants(population,nbchildren)
+        enfants = faire_enfants(instance,population,nbchildren)
         mutation(enfants,mutp)
         # Remplacer par le tabou
-        simple_local_search(instance,population,localMAXIT)
+        simple_local_search(instance,enfants,localMAXIT)
         for e ∈ enfants
             nbr_collision(instance,e)
         end
         append!(population,enfants)
         # Ajouter évitement de la convergence prématurée
         while length(population)>popsize
-            i = roue_fortune(population)
+            i = argmax([sample.obj for sample ∈ population])
             popat!(population,i)
         end
+        @info string("it: ",t,"\ttemps:",trunc(100*(time()-start_time))/100,"s\tconflits: ",[solution.obj for solution ∈ population])
     end
 end
