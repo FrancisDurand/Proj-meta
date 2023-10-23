@@ -208,13 +208,49 @@ function tabu_search(instance::Instance,population::Vector{Solution},MAXIT::Int)
     # TODO
 end
 
-"""Renvoie une solution aléatoire selon la règle de la roue de la fortune."""
-function roue_fortune(population::Vector{Solution})
-    # Solutions supposées évaluées
-    weights = [1/sample.obj for sample ∈ population]
+"""Renvoie un indice aléatoire selon la règle de la roue de la fortune."""
+function roue_fortune(weights::Vector{Float64})
     cumw = cumsum(weights)
     r = rand()*sum(weights)
     return findfirst(r .<= cumw)
+end
+
+function permutation_distance(similarity::Matrix{Int})
+    # TODO démontrer le principe de cet algorithme
+    perm = zeros(size(similarity)[1])
+    m,AB = findmax(similarity)
+    a,b = Tuple(AB)
+    while 0∈perm
+        similarity[a,b] = 0
+        m2,u = findmax(similarity[:,b])
+        m3,v = findmax(similarity[a,:])
+        if m2+m3≤m
+            # on a prouvé que perm[b] = a, sauvegarde, poursuite des recherches
+            similarity[:,b] .= 0
+            similarity[a,:] .= 0
+            perm[b] = a
+            m,AB = findmax(similarity)
+            a,b = Tuple(AB)
+        elseif m2+m3≤m+similarity(u,v)
+            # on a probablement perm[b] = a, mais c'est pas prouvé HELP!!
+        else
+            # on a prouvé que perm[b] ≠ a, poursuite des recherches
+            if m2≥m3
+                m = m2
+                a = u
+            else
+                m = m3
+                b = v
+            end
+        end
+    end
+    return perm
+end
+
+function distance(instance::Instance,x::Solution,y::Solution)
+    similarity = stack([[sum(x.nodecolors .== i .&& y.nodecolors .== j) for i = 1:instance.k] for j = 1:instance.k])
+    perm = permutation_distance(similarity)
+    return count(x.nodecolors .≠ y.nodecolors[perm])
 end
 
 """Copie des classes de couleurs entières des parents dans l'enfant\\
@@ -231,14 +267,20 @@ function croisement(instance::Instance,population::Vector{Solution},mom::Int,dad
     return enfant
 end
 
-function faire_enfants(instance::Instance,population::Vector{Solution},λ::Int)
+function faire_enfants(instance::Instance,population::Vector{Solution},λ::Int,DISTTHR::Int,BESTOBJ::Int)
     enfants = empty(population)
-    for e = 1:λ
+    for i = 1:λ
         mom=dad=0
         while mom==dad
-            mom,dad=roue_fortune(population),roue_fortune(population)
+            weights = [1/sample.obj for sample ∈ population]
+            mom,dad = roue_fortune(weights),roue_fortune(weights)
         end
-        push!(enfants,croisement(instance,population,mom,dad))
+        e = croisement(instance,population,mom,dad)
+        # Rejeter si trop proche de solutions existantes
+        dmin = minimum(distance(instance,sample,e) for sample ∈ population)
+        if dmin ≥ DISTTHR || nbr_collision(instance,e) < BESTOBJ
+            push!(enfants,e)
+        end
     end
     return enfants
 end
@@ -255,25 +297,37 @@ function mutation(population::Vector{Solution},r::Float64)
     end
 end
 
-function genetique(instance::Instance,popsize::Int,nbchildren::Int,mutp::Float64,MAXIT::Int,localMAXIT::Int)
+function genetique(instance::Instance,popsize::Int,nbchildren::Int,DISTTHR::Int,mutp::Float64,localMAXIT::Int,MAXIT::Int)
     start_time = time()
     population = [sol_alea(instance) for i = 1:popsize]
-    # Remplacer par le tabou
+    # Remplacer par le tabou ?
     simple_local_search(instance,population,localMAXIT)
+    BESTOBJ = minimum(sample.obj for sample ∈ population)
     @info string("it: ",0,"\ttemps:",trunc(100*(time()-start_time))/100,"s\tconflits: ",[solution.obj for solution ∈ population])
     for t = 1:MAXIT
-        enfants = faire_enfants(instance,population,nbchildren)
+        enfants = faire_enfants(instance,population,nbchildren,DISTTHR,BESTOBJ)
         mutation(enfants,mutp)
-        # Remplacer par le tabou
+        # Remplacer par le tabou ?
         simple_local_search(instance,enfants,localMAXIT)
-        for e ∈ enfants
-            nbr_collision(instance,e)
-        end
+        BESTOBJ = min(minimum(sample.obj for sample ∈ enfants),BESTOBJ)
         append!(population,enfants)
         # Ajouter évitement de la convergence prématurée
         while length(population)>popsize
-            i = argmax([sample.obj for sample ∈ population])
-            popat!(population,i)
+            distancematrix = stack([[distance(instance,s1,s2) for s1 ∈ population] for s2 ∈ population])
+            dmin,IJ = findmin(distancematrix)
+            I,J = 0,0
+            if dmin < DISTTHR
+                I,J = IJ
+            else
+                weights = [sample.obj for sample ∈ population]
+                I = roue_fortune(weights)
+                J = argmin(distancematrix[:,I])
+            end
+            if population[I].obj ≥ population[J].obj
+                popat!(population,I)
+            else
+                popat!(population,J)
+            end
         end
         @info string("it: ",t,"\ttemps:",trunc(100*(time()-start_time))/100,"s\tconflits: ",[solution.obj for solution ∈ population])
     end
