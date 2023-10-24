@@ -69,6 +69,23 @@ function read_instance(path::String,k::Int)
     return Instance(name,graphe,k)
 end
 
+
+# Définition des instances de base
+
+const instance_list = (
+    read_instance("graphs/flat300_26_0.col", 26),
+    read_instance("graphs/le450_15c.col", 15),
+    read_instance("graphs/dsjc125.1.col", 5),
+    read_instance("graphs/dsjc125.9.col", 44),
+    read_instance("graphs/dsjc250.1.col", 8),
+    read_instance("graphs/dsjc250.9.col", 72),
+    read_instance("graphs/dsjc250.5.col", 28),
+    read_instance("graphs/dsjc1000.5.col", 86),
+    read_instance("graphs/dsjc1000.5.col", 85),
+    read_instance("graphs/dsjc1000.5.col", 84)
+)
+
+
 # Fonctions de base
 
 """Calcule le nombre de collisions de la coloration."""
@@ -216,24 +233,29 @@ function roue_fortune(weights::Vector{Float64})
     return findfirst(r .<= cumw)
 end
 
-"""Calcule la permutation minimisant la distance entre deux solutions."""
+"""Calcule la permutation minimisant la distance entre deux solutions.\\
+On cherche donc la permutation maximisant ∑S(i,perm(i)) avec S la matrice de similarité."""
 function permutation_distance(similarity::Matrix{Int})
-    # TODO écrire algo qui marche, car celui-là est pourri (ex. programmation dynamique)
-    perm = zeros(size(similarity)[1])
-    m,AB = findmax(similarity)
+    # TODO résoudre boucles infinies inexpliquées
+    # Le problème de la recherche de la meilleure permutation est NP-complet
+    # Donc on va pas s'amuser à écrire un algo exact
+    # Ceci est donc une heuristique
+    perm = zeros(Int,size(similarity)[1])
+    m,AB = findmax(similarity) # On choisit la plus grande valeur de S -> perm[b] ≟ a
     a,b = Tuple(AB)
     while 0∈perm
         similarity[a,b] = 0
-        m2,u = findmax(similarity[:,b])
-        m3,v = findmax(similarity[a,:])
-        if m2+m3≤m
+        m2,u = findmax(similarity[:,b]) # On cherche la deuxième meilleure valeur de S sur la colonne b -> perm[b] ≟ u
+        m3,v = findmax(similarity[a,:])                                                       # ligne a -> perm[v] ≟ a
+        if m2 + m3 ≤ m + similarity[u,v]
+            # On se dit qu'il y a des chances que perm[b] = a si S(a,b)+S(u,v)≥S(u,b)+S(a,v), sinon on pourrait échanger et obtenir perm[b] = u et perm[v] = a qui aurait un meilleur objectif
             similarity[:,b] .= 0
             similarity[a,:] .= 0
             perm[b] = a
-            m,AB = findmax(similarity)
+            m,AB = findmax(similarity) # Il y a des chances que les plus grands éléments de S soient atteints par la permutation
             a,b = Tuple(AB)
-        elseif m2+m3≤m+similarity(u,v)
         else
+            # Il y a des chances que perm[b] ≠ a donc il y a des chances qu'il y ait au moins perm[b] = u ou perm[v] = a (il existe un unique élément de S atteint sur chaque ligne et chaque colonne). On commence par tester celui qui atteint la plus grande valeur de S
             if m2≥m3
                 m = m2
                 a = u
@@ -250,7 +272,8 @@ end
 function distance(instance::Instance,x::Solution,y::Solution)
     similarity = stack([[sum(x.nodecolors .== i .&& y.nodecolors .== j) for i = 1:instance.k] for j = 1:instance.k])
     perm = permutation_distance(similarity)
-    return count(x.nodecolors .≠ y.nodecolors[perm])
+    dist = count(x.nodecolors .≠ [perm[c] for c ∈ y.nodecolors])
+    return dist
 end
 
 """Copie des classes de couleurs entières des parents dans l'enfant\\
@@ -301,7 +324,9 @@ end
 """Opérateur d'élimination, évite la convergence prématurée en maintenant une diversité dans la population."""
 function discard_excess(instance::Instance,population::Vector{Solution},DISTTHR::Int,popsize::Int)
     while length(population)>popsize
+        @debug "Calcul des distances entre échantillons…"
         distancematrix = stack([[distance(instance,s1,s2) for s1 ∈ population] for s2 ∈ population])
+        @debug "Done."
         dmin,IJ = findmin(distancematrix)
         I,J = 0,0
         if dmin < DISTTHR
@@ -322,7 +347,7 @@ function discard_excess(instance::Instance,population::Vector{Solution},DISTTHR:
 end
 
 """Algorithme mémétique"""
-function genetique(instance::Instance,popsize::Int,nbchildren::Int,DISTTHR::Int,mutp::Float64,localMAXIT::Int,MAXIT::Int)
+function genetique(instance::Instance,popsize::Int,nbchildren::Int,DISTTHR::Int,mutp::Float64,MAXIT::Int,localMAXIT::Int)
     start_time = time()
     population = [sol_alea(instance) for i = 1:popsize]
     # Remplacer par le tabou ?
