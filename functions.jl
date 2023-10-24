@@ -190,6 +190,7 @@ end
 
 # Algorithme mémétique
 
+"""Lance une recherche locale simple sur chaque individu de la population. S'arrête dès que l'on atteint un minimum local ou un plateau."""
 function simple_local_search(instance::Instance,population::Vector{Solution},MAXIT::Int)
     for solution ∈ population
         old_obj = length(instance)^2
@@ -215,8 +216,9 @@ function roue_fortune(weights::Vector{Float64})
     return findfirst(r .<= cumw)
 end
 
+"""Calcule la permutation minimisant la distance entre deux solutions."""
 function permutation_distance(similarity::Matrix{Int})
-    # TODO démontrer le principe de cet algorithme
+    # TODO écrire algo qui marche, car celui-là est pourri (ex. programmation dynamique)
     perm = zeros(size(similarity)[1])
     m,AB = findmax(similarity)
     a,b = Tuple(AB)
@@ -225,16 +227,13 @@ function permutation_distance(similarity::Matrix{Int})
         m2,u = findmax(similarity[:,b])
         m3,v = findmax(similarity[a,:])
         if m2+m3≤m
-            # on a prouvé que perm[b] = a, sauvegarde, poursuite des recherches
             similarity[:,b] .= 0
             similarity[a,:] .= 0
             perm[b] = a
             m,AB = findmax(similarity)
             a,b = Tuple(AB)
         elseif m2+m3≤m+similarity(u,v)
-            # on a probablement perm[b] = a, mais c'est pas prouvé HELP!!
         else
-            # on a prouvé que perm[b] ≠ a, poursuite des recherches
             if m2≥m3
                 m = m2
                 a = u
@@ -247,6 +246,7 @@ function permutation_distance(similarity::Matrix{Int})
     return perm
 end
 
+"""Calcule la distance entre deux solutions."""
 function distance(instance::Instance,x::Solution,y::Solution)
     similarity = stack([[sum(x.nodecolors .== i .&& y.nodecolors .== j) for i = 1:instance.k] for j = 1:instance.k])
     perm = permutation_distance(similarity)
@@ -267,9 +267,10 @@ function croisement(instance::Instance,population::Vector{Solution},mom::Int,dad
     return enfant
 end
 
+"""Génère λ enfants à partir des parents et s'assure qu'aucun n'est trop proche d'une solution existante."""
 function faire_enfants(instance::Instance,population::Vector{Solution},λ::Int,DISTTHR::Int,BESTOBJ::Int)
     enfants = empty(population)
-    for i = 1:λ
+    while length(enfants) < λ
         mom=dad=0
         while mom==dad
             weights = [1/sample.obj for sample ∈ population]
@@ -297,6 +298,30 @@ function mutation(population::Vector{Solution},r::Float64)
     end
 end
 
+"""Opérateur d'élimination, évite la convergence prématurée en maintenant une diversité dans la population."""
+function discard_excess(instance::Instance,population::Vector{Solution},DISTTHR::Int,popsize::Int)
+    while length(population)>popsize
+        distancematrix = stack([[distance(instance,s1,s2) for s1 ∈ population] for s2 ∈ population])
+        dmin,IJ = findmin(distancematrix)
+        I,J = 0,0
+        if dmin < DISTTHR
+            # Élimine les solutions trop proches
+            I,J = IJ
+        else
+            # Maintient une distance moyenne entre les solutions
+            weights = [sample.obj for sample ∈ population]
+            I = roue_fortune(weights)
+            J = argmin(distancematrix[:,I])
+        end
+        if population[I].obj ≥ population[J].obj
+            popat!(population,I)
+        else
+            popat!(population,J)
+        end
+    end
+end
+
+"""Algorithme mémétique"""
 function genetique(instance::Instance,popsize::Int,nbchildren::Int,DISTTHR::Int,mutp::Float64,localMAXIT::Int,MAXIT::Int)
     start_time = time()
     population = [sol_alea(instance) for i = 1:popsize]
@@ -311,24 +336,7 @@ function genetique(instance::Instance,popsize::Int,nbchildren::Int,DISTTHR::Int,
         simple_local_search(instance,enfants,localMAXIT)
         BESTOBJ = min(minimum(sample.obj for sample ∈ enfants),BESTOBJ)
         append!(population,enfants)
-        # Ajouter évitement de la convergence prématurée
-        while length(population)>popsize
-            distancematrix = stack([[distance(instance,s1,s2) for s1 ∈ population] for s2 ∈ population])
-            dmin,IJ = findmin(distancematrix)
-            I,J = 0,0
-            if dmin < DISTTHR
-                I,J = IJ
-            else
-                weights = [sample.obj for sample ∈ population]
-                I = roue_fortune(weights)
-                J = argmin(distancematrix[:,I])
-            end
-            if population[I].obj ≥ population[J].obj
-                popat!(population,I)
-            else
-                popat!(population,J)
-            end
-        end
+        discard_excess(instance,population,DISTTHR,popsize)
         @info string("it: ",t,"\ttemps:",trunc(100*(time()-start_time))/100,"s\tconflits: ",[solution.obj for solution ∈ population])
     end
 end
