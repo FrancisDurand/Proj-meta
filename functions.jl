@@ -361,4 +361,5 @@ function genetique(instance::Instance,popsize::Int,nbchildren::Int,DISTTHR::Int,
         discard_excess(instance,population,DISTTHR,popsize)
         @info string("it: ",t,"\ttemps:",trunc(100*(time()-start_time))/100,"s\tconflits: ",[solution.obj for solution ∈ population])
     end
+    return population[argmin(solution.obj for solution ∈ population)]
 end
