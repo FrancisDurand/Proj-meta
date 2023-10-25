@@ -237,30 +237,15 @@ function permutation_distance(similarity::Matrix{Int})
     # Donc on va pas s'amuser à écrire un algo exact
     # Ceci est donc une heuristique
     perm = zeros(Int,size(similarity)[1])
-    m,AB = findmax(similarity) # On choisit la plus grande valeur de S -> perm[b] ≟ a
+    m,AB = findmax(similarity) # On choisit la plus grande valeur de S -> perm[b] = a
     M = m+1
     a,b = Tuple(AB)
     while 0∈perm
-        similarity[a,b] -= M
-        m2,u = findmax(@view similarity[:,b]) # On cherche la deuxième meilleure valeur de S sur la colonne b -> perm[b] ≟ u
-        m3,v = findmax(@view similarity[a,:])                                                       # ligne a -> perm[v] ≟ a
-        if m2 + m3 ≤ m + similarity[u,v]
-            # On se dit qu'il y a des chances que perm[b] = a si S(a,b)+S(u,v)≥S(u,b)+S(a,v), sinon on pourrait échanger et obtenir perm[b] = u et perm[v] = a qui aurait un meilleur objectif
-            @view(similarity[:,b]) .-= M
-            @view(similarity[a,:]) .-= M
-            perm[b] = a
-            m,AB = findmax(similarity) # Il y a des chances que les plus grands éléments de S soient atteints par la permutation
-            a,b = Tuple(AB)
-        else
-            # Il y a des chances que perm[b] ≠ a donc il y a des chances qu'il y ait au moins perm[b] = u ou perm[v] = a (il existe un unique élément de S atteint sur chaque ligne et chaque colonne). On commence par tester celui qui atteint la plus grande valeur de S
-            if m2≥m3
-                m = m2
-                a = u
-            else
-                m = m3
-                b = v
-            end
-        end
+        @view(similarity[:,b]) .-= M
+        @view(similarity[a,:]) .-= M
+        perm[b] = a
+        m,AB = findmax(similarity) # Il y a des chances que les plus grands éléments de S soient atteints par la permutation
+        a,b = Tuple(AB)
     end
     return perm
 end
