@@ -73,18 +73,19 @@ end
 
 # Définition des instances de base
 
-const instance_list = (
-    read_instance("graphs/flat300_26_0.col", 26),
-    read_instance("graphs/le450_15c.col", 15),
-    read_instance("graphs/dsjc125.1.col", 5),
-    read_instance("graphs/dsjc125.9.col", 44),
-    read_instance("graphs/dsjc250.1.col", 8),
-    read_instance("graphs/dsjc250.9.col", 72),
-    read_instance("graphs/dsjc250.5.col", 28),
-    read_instance("graphs/dsjc1000.5.col", 86),
-    read_instance("graphs/dsjc1000.5.col", 85),
-    read_instance("graphs/dsjc1000.5.col", 84)
-)
+@static if !@isdefined(instance_list)
+    const instance_list = (
+        read_instance("graphs/flat300_26_0.col", 26),
+        read_instance("graphs/le450_15c.col", 15),
+        read_instance("graphs/dsjc125.1.col", 5),
+        read_instance("graphs/dsjc125.9.col", 44),
+        read_instance("graphs/dsjc250.1.col", 8),
+        read_instance("graphs/dsjc250.9.col", 72),
+        read_instance("graphs/dsjc250.5.col", 28),
+        read_instance("graphs/dsjc1000.5.col", 86),
+        read_instance("graphs/dsjc1000.5.col", 85),
+        read_instance("graphs/dsjc1000.5.col", 84))
+end
 
 
 # Fonctions de base
@@ -187,7 +188,6 @@ function simple_neighbor(instance::Instance,solution::Solution)
 end
 
 
-
 # Tabou
 
 """Version de `simple_neighbor` qui implémente le tabou."""
@@ -223,10 +223,6 @@ function simple_local_search(instance::Instance,population::Vector{Solution},MAX
     end
 end
 
-function tabu_search(instance::Instance,population::Vector{Solution},MAXIT::Int)
-    # TODO
-end
-
 """Renvoie un indice aléatoire selon la règle de la roue de la fortune."""
 function roue_fortune(weights::Vector{Float64})
     cumw = cumsum(weights)
@@ -237,7 +233,6 @@ end
 """Calcule la permutation minimisant la distance entre deux solutions.\\
 On cherche donc la permutation maximisant ∑S(i,perm(i)) avec S la matrice de similarité."""
 function permutation_distance(similarity::Matrix{Int})
-    # TODO résoudre boucles infinies inexpliquées
     # Le problème de la recherche de la meilleure permutation est NP-complet
     # Donc on va pas s'amuser à écrire un algo exact
     # Ceci est donc une heuristique
@@ -247,12 +242,12 @@ function permutation_distance(similarity::Matrix{Int})
     a,b = Tuple(AB)
     while 0∈perm
         similarity[a,b] -= M
-        m2,u = findmax(similarity[:,b]) # On cherche la deuxième meilleure valeur de S sur la colonne b -> perm[b] ≟ u
-        m3,v = findmax(similarity[a,:])                                                       # ligne a -> perm[v] ≟ a
+        m2,u = findmax(@view similarity[:,b]) # On cherche la deuxième meilleure valeur de S sur la colonne b -> perm[b] ≟ u
+        m3,v = findmax(@view similarity[a,:])                                                       # ligne a -> perm[v] ≟ a
         if m2 + m3 ≤ m + similarity[u,v]
             # On se dit qu'il y a des chances que perm[b] = a si S(a,b)+S(u,v)≥S(u,b)+S(a,v), sinon on pourrait échanger et obtenir perm[b] = u et perm[v] = a qui aurait un meilleur objectif
-            similarity[:,b] .-= M
-            similarity[a,:] .-= M
+            @view(similarity[:,b]) .-= M
+            @view(similarity[a,:]) .-= M
             perm[b] = a
             m,AB = findmax(similarity) # Il y a des chances que les plus grands éléments de S soient atteints par la permutation
             a,b = Tuple(AB)
@@ -272,9 +267,17 @@ end
 
 """Calcule la distance entre deux solutions."""
 function distance(instance::Instance,x::Solution,y::Solution)
-    similarity = stack([[sum(x.nodecolors .== i .&& y.nodecolors .== j) for i = 1:instance.k] for j = 1:instance.k])
+    similarity = zeros(Int,(instance.k,instance.k))
+    for i = 1:length(instance)
+        similarity[x.nodecolors[i],y.nodecolors[i]] += 1
+    end
     perm = permutation_distance(similarity)
-    dist = count(x.nodecolors .≠ [perm[c] for c ∈ y.nodecolors])
+    dist = 0
+    for i = 1:length(instance)
+        if x.nodecolors[i] == perm[y.nodecolors[i]]
+            dist += 1
+        end
+    end
     return dist
 end
 
@@ -314,7 +317,14 @@ end
 """Opérateur d'élimination, évite la convergence prématurée en maintenant une diversité dans la population."""
 function discard_excess(instance::Instance,population::Vector{Solution},DISTTHR::Int,popsize::Int)
     while length(population)>popsize
-        distancematrix = stack([[distance(instance,s1,s2) for s1 ∈ population] for s2 ∈ population]) + LinearAlgebra.UniformScaling(length(instance))
+        distancetriangle = Matrix{Int}(undef,length(population),length(population))
+        for j = 1:length(population)
+            for i = j:length(population)
+                distancetriangle[i,j] = distance(instance,population[i],population[j])
+            end
+        end
+        distancetriangle += LinearAlgebra.UniformScaling(length(instance))
+        distancematrix = LinearAlgebra.Symmetric(distancetriangle)
         dmin,IJ = findmin(distancematrix)
         I,J = 0,0
         if dmin < DISTTHR
