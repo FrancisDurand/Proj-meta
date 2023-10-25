@@ -181,6 +181,7 @@ function simple_neighbor(instance::Instance,solution::Solution)
     if iszero(solution.conflictmatrix)
         fill_conflicts(instance,solution)
     end
+     # TODO optimiser cette ligne si possible
     improvementmatrix = solution.conflictmatrix .-
         sum(solution.conflictmatrix .* (1:instance.k .== permutedims(solution.nodecolors)),dims=1)
     color,node = Tuple(argmin(improvementmatrix))
@@ -241,8 +242,8 @@ function permutation_distance(similarity::Matrix{Int})
     M = m+1
     a,b = Tuple(AB)
     while 0∈perm
-        @view(similarity[:,b]) .-= M
-        @view(similarity[a,:]) .-= M
+        similarity[:,b] .= -1
+        similarity[a,:] .= -1
         perm[b] = a
         m,AB = findmax(similarity) # Il y a des chances que les plus grands éléments de S soient atteints par la permutation
         a,b = Tuple(AB)
@@ -304,7 +305,7 @@ function discard_excess(instance::Instance,population::Vector{Solution},DISTTHR:
     while length(population)>popsize
         distancetriangle = Matrix{Int}(undef,length(population),length(population))
         for j = 1:length(population)
-            for i = j:length(population)
+            for i = j+1:length(population)
                 distancetriangle[i,j] = distance(instance,population[i],population[j])
             end
         end
@@ -319,7 +320,7 @@ function discard_excess(instance::Instance,population::Vector{Solution},DISTTHR:
             # Maintient une distance moyenne entre les solutions
             weights = convert(Vector{Float64},[sample.obj for sample ∈ population])
             I = roue_fortune(weights)
-            J = argmin(distancematrix[:,I])
+            J = argmin(@view distancematrix[:,I])
         end
         if population[I].obj ≥ population[J].obj
             popat!(population,I)
@@ -333,13 +334,11 @@ end
 function genetique(instance::Instance,popsize::Int,nbchildren::Int,DISTTHR::Int,MAXIT::Int,localMAXIT::Int)
     start_time = time()
     population = [sol_alea(instance) for i = 1:popsize]
-    # Remplacer par le tabou ?
     simple_local_search(instance,population,localMAXIT)
     BESTOBJ = minimum(sample.obj for sample ∈ population)
     @info string("it: ",0,"\ttemps:",trunc(100*(time()-start_time))/100,"s\tconflits: ",[solution.obj for solution ∈ population])
     for t = 1:MAXIT
         enfants = faire_enfants(instance,population,nbchildren,DISTTHR,BESTOBJ)
-        # Remplacer par le tabou ?
         simple_local_search(instance,enfants,localMAXIT)
         BESTOBJ = isempty(enfants) ? BESTOBJ : min(minimum(sample.obj for sample ∈ enfants),BESTOBJ)
         append!(population,enfants)
