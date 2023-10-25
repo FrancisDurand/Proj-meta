@@ -1,3 +1,4 @@
+import LinearAlgebra
 using Logging
 using Random
 
@@ -213,7 +214,7 @@ function simple_local_search(instance::Instance,population::Vector{Solution},MAX
         old_obj = length(instance)^2
         for t = 1:MAXIT
             simple_neighbor(instance,solution)
-            @debug string("it: ",t,"\t","conflits: ",solution.obj)
+            # @debug string("it: ",t,"\t","conflits: ",solution.obj)
             if old_obj==solution.obj
                 break
             end
@@ -242,15 +243,16 @@ function permutation_distance(similarity::Matrix{Int})
     # Ceci est donc une heuristique
     perm = zeros(Int,size(similarity)[1])
     m,AB = findmax(similarity) # On choisit la plus grande valeur de S -> perm[b] ≟ a
+    M = m+1
     a,b = Tuple(AB)
     while 0∈perm
-        similarity[a,b] = 0
+        similarity[a,b] -= M
         m2,u = findmax(similarity[:,b]) # On cherche la deuxième meilleure valeur de S sur la colonne b -> perm[b] ≟ u
         m3,v = findmax(similarity[a,:])                                                       # ligne a -> perm[v] ≟ a
         if m2 + m3 ≤ m + similarity[u,v]
             # On se dit qu'il y a des chances que perm[b] = a si S(a,b)+S(u,v)≥S(u,b)+S(a,v), sinon on pourrait échanger et obtenir perm[b] = u et perm[v] = a qui aurait un meilleur objectif
-            similarity[:,b] .= 0
-            similarity[a,:] .= 0
+            similarity[:,b] .-= M
+            similarity[a,:] .-= M
             perm[b] = a
             m,AB = findmax(similarity) # Il y a des chances que les plus grands éléments de S soient atteints par la permutation
             a,b = Tuple(AB)
@@ -290,10 +292,10 @@ function croisement(instance::Instance,population::Vector{Solution},mom::Int,dad
     return enfant
 end
 
-"""Génère λ enfants à partir des parents et s'assure qu'aucun n'est trop proche d'une solution existante."""
+"""Génère λ enfants à partir des parents et rejette ceux trop proches d'une solution existante."""
 function faire_enfants(instance::Instance,population::Vector{Solution},λ::Int,DISTTHR::Int,BESTOBJ::Int)
     enfants = empty(population)
-    while length(enfants) < λ
+    for i = 1:λ
         mom=dad=0
         while mom==dad
             weights = [1/sample.obj for sample ∈ population]
@@ -309,32 +311,18 @@ function faire_enfants(instance::Instance,population::Vector{Solution},λ::Int,D
     return enfants
 end
 
-function mutation(solution::Solution)
-    # TODO
-end
-
-function mutation(population::Vector{Solution},r::Float64)
-    for sample ∈ population
-        if rand()<r
-            mutation(sample)
-        end
-    end
-end
-
 """Opérateur d'élimination, évite la convergence prématurée en maintenant une diversité dans la population."""
 function discard_excess(instance::Instance,population::Vector{Solution},DISTTHR::Int,popsize::Int)
     while length(population)>popsize
-        @debug "Calcul des distances entre échantillons…"
-        distancematrix = stack([[distance(instance,s1,s2) for s1 ∈ population] for s2 ∈ population])
-        @debug "Done."
+        distancematrix = stack([[distance(instance,s1,s2) for s1 ∈ population] for s2 ∈ population]) + LinearAlgebra.UniformScaling(length(instance))
         dmin,IJ = findmin(distancematrix)
         I,J = 0,0
         if dmin < DISTTHR
             # Élimine les solutions trop proches
-            I,J = IJ
+            I,J = Tuple(IJ)
         else
             # Maintient une distance moyenne entre les solutions
-            weights = [sample.obj for sample ∈ population]
+            weights = convert(Vector{Float64},[sample.obj for sample ∈ population])
             I = roue_fortune(weights)
             J = argmin(distancematrix[:,I])
         end
@@ -347,7 +335,7 @@ function discard_excess(instance::Instance,population::Vector{Solution},DISTTHR:
 end
 
 """Algorithme mémétique"""
-function genetique(instance::Instance,popsize::Int,nbchildren::Int,DISTTHR::Int,mutp::Float64,MAXIT::Int,localMAXIT::Int)
+function genetique(instance::Instance,popsize::Int,nbchildren::Int,DISTTHR::Int,MAXIT::Int,localMAXIT::Int)
     start_time = time()
     population = [sol_alea(instance) for i = 1:popsize]
     # Remplacer par le tabou ?
@@ -356,10 +344,9 @@ function genetique(instance::Instance,popsize::Int,nbchildren::Int,DISTTHR::Int,
     @info string("it: ",0,"\ttemps:",trunc(100*(time()-start_time))/100,"s\tconflits: ",[solution.obj for solution ∈ population])
     for t = 1:MAXIT
         enfants = faire_enfants(instance,population,nbchildren,DISTTHR,BESTOBJ)
-        mutation(enfants,mutp)
         # Remplacer par le tabou ?
         simple_local_search(instance,enfants,localMAXIT)
-        BESTOBJ = min(minimum(sample.obj for sample ∈ enfants),BESTOBJ)
+        BESTOBJ = isempty(enfants) ? BESTOBJ : min(minimum(sample.obj for sample ∈ enfants),BESTOBJ)
         append!(population,enfants)
         discard_excess(instance,population,DISTTHR,popsize)
         @info string("it: ",t,"\ttemps:",trunc(100*(time()-start_time))/100,"s\tconflits: ",[solution.obj for solution ∈ population])
