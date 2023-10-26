@@ -181,7 +181,6 @@ function simple_neighbor(instance::Instance,solution::Solution)
     if iszero(solution.conflictmatrix)
         fill_conflicts(instance,solution)
     end
-     # TODO optimiser cette ligne si possible
     improvementmatrix = solution.conflictmatrix .-
         sum(solution.conflictmatrix .* (1:instance.k .== permutedims(solution.nodecolors)),dims=1)
     color,node = Tuple(argmin(improvementmatrix))
@@ -238,15 +237,12 @@ function permutation_distance(similarity::Matrix{Int})
     # Donc on va pas s'amuser à écrire un algo exact
     # Ceci est donc une heuristique
     perm = zeros(Int,size(similarity)[1])
-    m,AB = findmax(similarity) # On choisit la plus grande valeur de S -> perm[b] = a
-    M = m+1
-    a,b = Tuple(AB)
+    a,b = Tuple(argmax(similarity)) # On choisit la plus grande valeur de S -> perm[b] = a
     while 0∈perm
         similarity[:,b] .= -1
         similarity[a,:] .= -1
         perm[b] = a
-        m,AB = findmax(similarity) # Il y a des chances que les plus grands éléments de S soient atteints par la permutation
-        a,b = Tuple(AB)
+        a,b = Tuple(argmax(similarity)) # Il y a des chances que les plus grands éléments de S soient atteints par la permutation
     end
     return perm
 end
@@ -281,7 +277,7 @@ function croisement(instance::Instance,population::Vector{Solution},mom::Int,dad
     return enfant
 end
 
-"""Génère λ enfants à partir des parents et rejette ceux trop proches d'une solution existante."""
+"""Génère λ enfants à partir des parents grâce à l'opérateur de croisement et rejette ceux trop proches d'une solution existante."""
 function faire_enfants(instance::Instance,population::Vector{Solution},λ::Int,DISTTHR::Int,BESTOBJ::Int)
     enfants = empty(population)
     for i = 1:λ
@@ -305,11 +301,11 @@ function discard_excess(instance::Instance,population::Vector{Solution},DISTTHR:
     while length(population)>popsize
         distancetriangle = Matrix{Int}(undef,length(population),length(population))
         for j = 1:length(population)
-            for i = j+1:length(population)
+            distancetriangle[j,j] = length(instance)
+            for i = 1:j-1
                 distancetriangle[i,j] = distance(instance,population[i],population[j])
             end
         end
-        distancetriangle += LinearAlgebra.UniformScaling(length(instance))
         distancematrix = LinearAlgebra.Symmetric(distancetriangle)
         dmin,IJ = findmin(distancematrix)
         I,J = 0,0
@@ -318,7 +314,7 @@ function discard_excess(instance::Instance,population::Vector{Solution},DISTTHR:
             I,J = Tuple(IJ)
         else
             # Maintient une distance moyenne entre les solutions
-            weights = convert(Vector{Float64},[sample.obj for sample ∈ population])
+            weights = [1. *sample.obj for sample ∈ population]
             I = roue_fortune(weights)
             J = argmin(@view distancematrix[:,I])
         end
@@ -330,10 +326,14 @@ function discard_excess(instance::Instance,population::Vector{Solution},DISTTHR:
     end
 end
 
-"""Algorithme mémétique"""
 function genetique(instance::Instance,popsize::Int,nbchildren::Int,DISTTHR::Int,MAXIT::Int,localMAXIT::Int)
-    start_time = time()
     population = [sol_alea(instance) for i = 1:popsize]
+    return genetique(instance,population,popsize,nbchildren,DISTTHR,MAXIT,localMAXIT)
+end
+
+"""Algorithme mémétique"""
+function genetique(instance::Instance,population::Vector{Solution},popsize::Int,nbchildren::Int,DISTTHR::Int,MAXIT::Int,localMAXIT::Int)
+    start_time = time()
     simple_local_search(instance,population,localMAXIT)
     BESTOBJ = minimum(sample.obj for sample ∈ population)
     @info string("it: ",0,"\ttemps:",trunc(100*(time()-start_time))/100,"s\tconflits: ",[solution.obj for solution ∈ population])
