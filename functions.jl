@@ -320,14 +320,15 @@ function genetique(instance::Instance,population::Vector{Solution},popsize::Int,
     start_time = time()
     simple_local_search(instance,population,localMAXIT)
     BESTOBJ = minimum(sample.obj for sample ∈ population)
-    @info string("it: ",0,"\ttemps:",trunc(100*(time()-start_time))/100,"s\tconflits: ",[solution.obj for solution ∈ population])
+    # @info string("it: ",0,"\ttemps:",trunc(100*(time()-start_time))/100,"s\tconflits: ",[solution.obj for solution ∈ population])
     for t = 1:MAXIT
         enfants = faire_enfants(instance,population,nbchildren,DISTTHR,BESTOBJ)
         simple_local_search(instance,enfants,localMAXIT)
         BESTOBJ = isempty(enfants) ? BESTOBJ : min(minimum(sample.obj for sample ∈ enfants),BESTOBJ)
         append!(population,enfants)
         discard_excess(instance,population,DISTTHR,popsize)
-        @info string("it: ",t,"\ttemps:",trunc(100*(time()-start_time))/100,"s\tconflits: ",[solution.obj for solution ∈ population])
+        # @info string("it: ",t,"\ttemps:",trunc(100*(time()-start_time))/100,"s\tconflits: ",[solution.obj for solution ∈ population])
     end
+    @info string("it: ",MAXIT,"\ttemps:",trunc(100*(time()-start_time))/100,"s\tconflits: ",[solution.obj for solution ∈ population])
     return population[argmin(solution.obj for solution ∈ population)]
 end
