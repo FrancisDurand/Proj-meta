@@ -310,20 +310,20 @@ function discard_excess(instance::Instance,population::Vector{Solution},DISTTHR:
     end
 end
 
-function genetique(instance::Instance,popsize::Int,nbchildren::Int,DISTTHR::Int,MAXIT::Int,localMAXIT::Int)
+function genetique(instance::Instance,popsize::Int,nbchildren::Int,DISTTHR::Int,MAXIT::Int)
     population = [sol_alea(instance) for i = 1:popsize]
-    return genetique(instance,population,popsize,nbchildren,DISTTHR,MAXIT,localMAXIT)
+    return genetique(instance,population,popsize,nbchildren,DISTTHR,MAXIT)
 end
 
 """Algorithme mémétique"""
-function genetique(instance::Instance,population::Vector{Solution},popsize::Int,nbchildren::Int,DISTTHR::Int,MAXIT::Int,localMAXIT::Int)
+function genetique(instance::Instance,population::Vector{Solution},popsize::Int,nbchildren::Int,DISTTHR::Int,MAXIT::Int)
     start_time = time()
-    simple_local_search(instance,population,localMAXIT)
+    simple_local_search(instance,population,length(instance))
     BESTOBJ = minimum(sample.obj for sample ∈ population)
     # @info string("it: ",0,"\ttemps:",trunc(100*(time()-start_time))/100,"s\tconflits: ",[solution.obj for solution ∈ population])
     for t = 1:MAXIT
         enfants = faire_enfants(instance,population,nbchildren,DISTTHR,BESTOBJ)
-        simple_local_search(instance,enfants,localMAXIT)
+        simple_local_search(instance,enfants,length(instance))
         BESTOBJ = isempty(enfants) ? BESTOBJ : min(minimum(sample.obj for sample ∈ enfants),BESTOBJ)
         append!(population,enfants)
         discard_excess(instance,population,DISTTHR,popsize)
