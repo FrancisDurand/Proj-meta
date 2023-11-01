@@ -240,7 +240,7 @@ function distance(instance::Instance,x::Solution,y::Solution)
     perm = permutation_distance(similarity)
     dist = 0
     for i = 1:length(instance)
-        if x.nodecolors[i] == perm[y.nodecolors[i]]
+        if x.nodecolors[i] ≠ perm[y.nodecolors[i]]
             dist += 1
         end
     end
