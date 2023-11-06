@@ -1,0 +1,2 @@
+instance:, graphs/flat300_26_0.col k=26, graphs/le450_15c.col k=15, graphs/dsjc125.1.col k=5, graphs/dsjc125.9.col k=44, graphs/dsjc250.1.col k=8, graphs/dsjc250.9.col k=72, graphs/dsjc250.5.col k=28, graphs/dsjc1000.5.col k=86, graphs/dsjc1000.5.col k=85, graphs/dsjc1000.5.col k=84, 
+Genetique 10 10 k/2 1000 200, 95, 195, 9, 19, 15, 48, 30, 140, 174, 182, 

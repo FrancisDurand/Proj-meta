@@ -1,0 +1,6 @@
+instance:, graphs/flat300_26_0.col k=26, graphs/le450_15c.col k=15, graphs/dsjc125.1.col k=5, graphs/dsjc125.9.col k=44, graphs/dsjc250.1.col k=8, graphs/dsjc250.9.col k=72, graphs/dsjc250.5.col k=28, graphs/dsjc1000.5.col k=86, graphs/dsjc1000.5.col k=85, graphs/dsjc1000.5.col k=84, 
+Glouton, 0.0s, 0.0s, 0.0s, 0.0s, 0.0s, 0.0s, 0.0s, 0.09s, 0.07s, 0.11s, 
+Genetique 25 10 10 25 30, 4.62s, 2.41s, 0.2s, 13.67s, 0.51s, 59.77s, 4.71s, 131.59s, 135.45s, 124.84s, 
+Genetique 25 10 10 25 100, 5.53s, 3.64s, 0.15s, 14.39s, 0.63s, 66.36s, 6.05s, 159.87s, 154.19s, 151.65s, 
+Genetique 50 10 10 25 30, 11.75s, 4.84s, 0.49s, 46.44s, 1.18s, 212.67s, 14.13s, 383.18s, 372.13s, 359.68s, 
+Genetique 25 25 50 25 30, 1.28s, 9.18s, 0.09s, 2.18s, 0.17s, 268.93s, 1.19s, 514.01s, 453.58s, 438.4s, 
