@@ -194,10 +194,12 @@ end
 
 """Lance une recherche locale simple sur chaque individu de la population. S'arrête dès que l'on atteint un minimum local ou un plateau."""
 function simple_local_search(instance::Instance,population::Vector{Solution},MAXIT::Int)
+    nb_explore = 0 
     for solution ∈ population
         old_obj = length(instance)^2
         for t = 1:MAXIT
             simple_neighbor(instance,solution)
+            nb_explore += 1
             # @debug string("it: ",t,"\t","conflits: ",solution.obj)
             if old_obj==solution.obj
                 break
@@ -205,6 +207,7 @@ function simple_local_search(instance::Instance,population::Vector{Solution},MAX
             old_obj=solution.obj
         end
     end
+    return(nb_explore)
 end
 
 """Renvoie un indice aléatoire selon la règle de la roue de la fortune."""
@@ -318,17 +321,17 @@ end
 """Algorithme mémétique"""
 function genetique(instance::Instance,population::Vector{Solution},popsize::Int,nbchildren::Int,DISTTHR::Int,MAXIT::Int)
     start_time = time()
-    simple_local_search(instance,population,length(instance))
+    nb_explore = simple_local_search(instance,population,length(instance))
     BESTOBJ = minimum(sample.obj for sample ∈ population)
     # @info string("it: ",0,"\ttemps:",trunc(100*(time()-start_time))/100,"s\tconflits: ",[solution.obj for solution ∈ population])
     for t = 1:MAXIT
         enfants = faire_enfants(instance,population,nbchildren,DISTTHR,BESTOBJ)
-        simple_local_search(instance,enfants,length(instance))
+        nb_explore += simple_local_search(instance,enfants,length(instance))
         BESTOBJ = isempty(enfants) ? BESTOBJ : min(minimum(sample.obj for sample ∈ enfants),BESTOBJ)
         append!(population,enfants)
         discard_excess(instance,population,DISTTHR,popsize)
         # @info string("it: ",t,"\ttemps:",trunc(100*(time()-start_time))/100,"s\tconflits: ",[solution.obj for solution ∈ population])
     end
-    @info string("it: ",MAXIT,"\ttemps:",trunc(100*(time()-start_time))/100,"s\tconflits: ",[solution.obj for solution ∈ population])
-    return population[argmin(solution.obj for solution ∈ population)]
+    @info string("it: ",MAXIT,"\ttemps:",trunc(100*(time()-start_time))/100,"s\tconflits: ",[solution.obj for solution ∈ population],"\tnb solutions explorées: ",nb_explore)
+    return (population[argmin(solution.obj for solution ∈ population)],nb_explore)
 end
