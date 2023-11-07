@@ -1,7 +1,8 @@
-# Proj-meta
+# Proj-meta par Francis Durand et Michel Sénégas
 Implémentation d'une métaheuristique pour la k-coloration d'un graphe
 
+Nous conseillons la lecture du Jupyter Notebook Jupyter_tests.ipynb. Les cellules sont exécutables.
 
-Je fais des tests, je précise que je suis naze en code donc je fais des trucs chelous je pense mais on pourra en discuter
+C'est notre document principal. Il fait appel au fichier fonctions.jl ou sont écrites nos fonctions. 
 
-si je modifie
+Le fichier tests_anciennes_versions regroupe des tests efféctués pour ajuster les paramètres, nous nous sommes même rendu compte qu'un des paramètre était inutile, nous l'avons donc supprimé dans les dernieres versions.

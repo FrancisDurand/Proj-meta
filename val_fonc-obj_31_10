@@ -1,6 +1,0 @@
-instance:, graphs/flat300_26_0.col k=26, graphs/le450_15c.col k=15, graphs/dsjc125.1.col k=5, graphs/dsjc125.9.col k=44, graphs/dsjc250.1.col k=8, graphs/dsjc250.9.col k=72, graphs/dsjc250.5.col k=28, graphs/dsjc1000.5.col k=86, graphs/dsjc1000.5.col k=85, graphs/dsjc1000.5.col k=84, 
-Glouton, 226, 362, 47, 21, 88, 61, 85, 378, 398, 412, 
-Genetique 25 10 10 25 30, 360, 666, 7, 6, 35, 45, 73, 2551, 2533, 2573, 
-Genetique 25 10 10 25 100, 104, 237, 7, 4, 17, 17, 31, 971, 1669, 1195, 
-Genetique 50 10 10 25 30, 421, 771, 8, 4, 113, 147, 192, 2490, 2529, 2568, 
-Genetique 25 25 50 25 30, 582, 271, 42, 59, 222, 32, 338, 2527, 2530, 2595, 
